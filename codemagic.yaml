@@ -1,0 +1,47 @@
+# Uzay Kaydırağı — iOS derlemesi ve TestFlight'a yükleme (Codemagic)
+# Gerekli ortam değişkeni grubu: "appstore" (Codemagic > uygulama > Environment variables)
+#   APP_STORE_CONNECT_ISSUER_ID        App Store Connect API anahtarının Issuer ID'si
+#   APP_STORE_CONNECT_KEY_IDENTIFIER   Anahtarın Key ID'si
+#   APP_STORE_CONNECT_PRIVATE_KEY      İndirdiğin .p8 dosyasının TÜM içeriği (Secret işaretli)
+#   CERTIFICATE_PRIVATE_KEY            ssh-keygen ile ürettiğin cert_key dosyasının TÜM içeriği (Secret işaretli)
+workflows:
+  ios-testflight:
+    name: iOS → TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      groups:
+        - appstore
+      vars:
+        BUNDLE_ID: "com.burak383.uzaykaydiragi"
+      node: 22
+      xcode: latest
+    triggering:
+      events: []
+    scripts:
+      - name: npm paketleri
+        script: npm ci --omit=dev
+      - name: Web dosyalarını iOS projesine kopyala
+        script: npx cap sync ios
+      - name: İmza sertifikası ve profilini hazırla (yoksa oluşturur)
+        script: |
+          keychain initialize
+          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
+          keychain add-certificates
+          xcode-project use-profiles
+      - name: Build numarasını artır
+        script: |
+          cd ios/App
+          agvtool new-version -all $((BUILD_NUMBER + 1))
+      - name: IPA üret
+        script: |
+          xcode-project build-ipa --project ios/App/App.xcodeproj --scheme App
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        submit_to_testflight: true

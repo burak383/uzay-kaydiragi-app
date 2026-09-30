@@ -56,15 +56,31 @@ Not: Android uygulamasındaki banner biriminin adı AdMob'da "gecis" görünüyo
 
 Telefonda hızlı deneme: USB hata ayıklamayı aç, Android Studio'da ▶ Run.
 
-## iOS
+## iOS (Mac olmadan: GitHub + Codemagic)
 
-Xcode sadece Mac'te çalışır. İki yol:
-- **Mac varsa:** `npm install`, `npx cap sync ios`, `npx cap open ios` → Xcode'da Signing & Capabilities'ten ekibini seç → Product > Archive → App Store Connect'e yükle.
-- **Mac yoksa:** Projeyi GitHub'a (burak383) yükle ve **Codemagic**'e bağla. Codemagic'te "Capacitor" iş akışını seç, App Store Connect API anahtarını ekle; derleyip TestFlight'a yükler.
+Projede hazır bir `codemagic.yaml` var. Codemagic bulutta bir Mac'te derler, imzalar ve TestFlight'a yükler.
+Uygulama sadece iPhone için ayarlı (iPad ekran görüntüsü gerekmez), dikey ekran.
 
-App Store Connect'te: App Privacy formunda "Kimlik bilgileri > Cihaz kimliği, üçüncü taraf reklam" işaretle. `Info.plist` içinde şifreleme beyanı (`ITSAppUsesNonExemptEncryption = false`) hazır.
+1. **Bundle ID:** developer.apple.com > Certificates, IDs & Profiles > Identifiers > + > App IDs > App
+   - Bundle ID (Explicit): `com.burak383.uzaykaydiragi`, açıklama: Uzay Kaydiragi. Ek yetenek seçme.
+2. **App Store Connect'te uygulama:** Uygulamalar > + > Yeni Uygulama > iOS, ad "Uzay Kaydırağı", dil Türkçe, yukarıdaki Bundle ID, SKU: `uzaykaydiragi`.
+3. **API anahtarı:** App Store Connect > Kullanıcılar ve Erişim > Entegrasyonlar > App Store Connect API > Ekip Anahtarları > + (erişim: **App Manager**).
+   `.p8` dosyasını indir (bir kez indirilebilir), **Issuer ID** ve **Key ID**'yi not al.
+4. **Sertifika anahtarı (PowerShell):**
+   ```powershell
+   ssh-keygen -t rsa -b 2048 -m PEM -f C:\Anahtarlar\ios_cert_key -q -N '""'
+   ```
+5. **Kodu GitHub'a yükle** (özel/private repo, `node_modules` hariç).
+6. **Codemagic:** codemagic.io'ya GitHub ile gir > Add application > repoyu seç > "codemagic.yaml" türü.
+   Environment variables sekmesinde `appstore` grubuna şu 4 değişkeni ekle (son ikisi **Secret**):
+   - `APP_STORE_CONNECT_ISSUER_ID`
+   - `APP_STORE_CONNECT_KEY_IDENTIFIER`
+   - `APP_STORE_CONNECT_PRIVATE_KEY` → .p8 dosyasının tüm içeriği
+   - `CERTIFICATE_PRIVATE_KEY` → `C:\Anahtarlar\ios_cert_key` dosyasının tüm içeriği
+7. **Start new build** > `ios-testflight`. 10-20 dakikada biter, derleme TestFlight'a düşer.
 
-`Info.plist` içindeki `SKAdNetworkItems` listesinde şimdilik sadece Google'ın kimliği var. Google'ın AdMob iOS "Get started" sayfasındaki tam listeyi eklemen iOS'ta reklam gelirini artırır.
+Kişisel Codemagic hesabı ayda 500 dakika macOS M2 derlemesini ücretsiz verir.
+Sonra App Store Connect'te ekran görüntülerini, açıklamayı ve gizlilik formunu doldurup TestFlight'taki derlemeyi seçerek incelemeye gönder.
 
 ## app-ads.txt
 AdMob, reklam gelirini tam almak için geliştirici web sitende `app-ads.txt` ister. Mağaza kayıtlarındaki "geliştirici web sitesi" alanına bir site gir ve kök dizine AdMob > Uygulamalar > app-ads.txt'deki satırı koy (ücretsiz: GitHub Pages).
