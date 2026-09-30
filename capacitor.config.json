@@ -1,0 +1,8 @@
+{
+  "appId": "com.burak383.uzaykaydiragi",
+  "appName": "Uzay Kaydırağı",
+  "webDir": "www",
+  "backgroundColor": "#03050f",
+  "android": { "backgroundColor": "#03050f" },
+  "ios": { "backgroundColor": "#03050f", "contentInset": "never" }
+}

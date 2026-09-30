@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Uzay Kaydırağı</string>
+    <string name="title_activity_main">Uzay Kaydırağı</string>
+    <string name="package_name">com.burak383.uzaykaydiragi</string>
+    <string name="custom_url_scheme">com.burak383.uzaykaydiragi</string>
+    <string name="admob_app_id">ca-app-pub-9017194698663463~5917833167</string>
+</resources>
