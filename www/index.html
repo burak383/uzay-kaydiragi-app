@@ -68,10 +68,11 @@ button{font-family:inherit}
 .factc.locked{border-left-color:var(--line);opacity:.65}
 .factc.locked small{color:var(--muted)}
 body.menu #fact{display:none!important}
+#adDiag{white-space:pre-wrap;word-break:break-word;font:11px/1.5 var(--mono);color:var(--ink);background:#060a16;border:1px solid var(--line);border-radius:6px;padding:10px;margin:0;max-height:260px;overflow:auto}
 #hint{bottom:calc(16px + env(safe-area-inset-bottom,0px));left:0;right:0;text-align:center;font-size:12px;color:var(--muted);padding-inline:16px}
 #flash{position:fixed;inset:0;background:radial-gradient(ellipse at center,transparent 35%,var(--danger));opacity:0;pointer-events:none;z-index:3;transition:opacity .35s}
 #heatV{position:fixed;inset:0;background:radial-gradient(ellipse at center,transparent 45%,rgba(255,110,40,.9));opacity:0;pointer-events:none;z-index:1;mix-blend-mode:screen}
-#joy{position:fixed;z-index:4;width:120px;height:120px;margin:-60px 0 0 -60px;border-radius:50%;border:2px solid rgba(127,227,255,.45);background:rgba(127,227,255,.07);pointer-events:none}
+#joy{position:fixed;z-index:4;width:140px;height:140px;margin:-70px 0 0 -70px;border-radius:50%;border:2px solid rgba(127,227,255,.45);background:rgba(127,227,255,.07);pointer-events:none}
 #joy i{position:absolute;left:50%;top:50%;width:48px;height:48px;margin:-24px 0 0 -24px;border-radius:50%;background:rgba(127,227,255,.35);border:2px solid var(--glass)}
 .topbtn{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));z-index:4;width:34px;height:34px;border-radius:4px;border:1px solid #2a3a55;background:rgba(3,5,15,.5);color:var(--ink);font:600 13px var(--mono);cursor:pointer;display:grid;place-items:center}
 .topbtn:focus-visible{outline:2px solid var(--glass)}
@@ -215,11 +216,14 @@ button.go:focus-visible,button.ghost:focus-visible{outline:2px solid var(--ink);
 
     <div class="panel settings" id="p-set" hidden>
       <div class="tog"><span>Dil</span><button id="setLang" aria-pressed="true">Türkçe</button></div>
+      <div class="tog"><span>Kontrol hassasiyeti</span><button id="setSens" aria-pressed="true">Normal</button></div>
       <div class="tog"><span>Ses efektleri</span><button id="setSfx" aria-pressed="true">Açık</button></div>
       <div class="tog"><span>Müzik</span><button id="setMusic" aria-pressed="true">Açık</button></div>
       <div class="tog"><span>Titreşim (telefon)</span><button id="setVib" aria-pressed="true">Açık</button></div>
       <div class="tog"><span>Telefonu eğerek yönlendir</span><button id="setTilt" aria-pressed="false">Kapalı</button></div>
       <p class="note" id="tiltNote"></p>
+      <p class="note" id="verTap">Uzay Kaydırağı 1.1</p>
+      <pre id="adDiag" hidden></pre>
     </div>
   </div>
 </div>
@@ -292,7 +296,7 @@ const EN = {
   'Kaymaya başla':'Start sliding','kristal · koşularda topladıkların burada birikir':'crystals · everything you collect in runs adds up here',
   'Giysi':'Suit','Vizör':'Visor','İz':'Trail','Skor tablosu yükleniyor…':'Loading leaderboard…',
   'Ses efektleri':'Sound effects','Müzik':'Music','Titreşim (telefon)':'Vibration (phone)','Telefonu eğerek yönlendir':'Steer by tilting the phone',
-  'Dil':'Language','Açık':'On','Kapalı':'Off','Kalkanlar bitti':'Out of shields','skor':'score','en iyi kombo':'best combo',
+  'Dil':'Language','Kontrol hassasiyeti':'Control sensitivity','Düşük':'Low','Normal':'Normal','Yüksek':'High','Açık':'On','Kapalı':'Off','Kalkanlar bitti':'Out of shields','skor':'score','en iyi kombo':'best combo',
   'Reklam izle, kristalleri 2 katına çıkar':'Watch an ad to double your crystals','Tekrar kay':'Slide again','Menü':'Menu',
   'Son şans':'Last chance','Kısa bir reklam izle, Ayaz 1 kalkanla kaldığı yerden devam etsin. Her turda bir kez.':'Watch a short ad and Ayaz carries on from here with 1 shield. Once per run.',
   'Reklam izle, devam et':'Watch an ad to continue','Bitir':'End run','Reklam alanı · banner önizlemesi':'Ad space · banner preview',
@@ -1201,7 +1205,9 @@ function buildPickups(){
 }
 
 // ---------- audio (WebAudio, all synthesized) ----------
-const settings = Object.assign({sfx:true, music:true, vib:true, tilt:false}, store.get('settings', {}));
+const settings = Object.assign({sfx:true, music:true, vib:true, tilt:false, sens:1}, store.get('settings', {}));
+// steering sensitivity presets: [label, max sideways speed, response]
+const SENS = [['Düşük', 5.2, 6], ['Normal', 6.6, 7.5], ['Yüksek', 8.2, 9.5]];
 settings.tilt = false;
 const Snd = {
   ctx:null, ready:false,
@@ -1311,26 +1317,35 @@ const Ads = {
   interReady:false, rewardReady:false, bannerShown:false,
   finishedRuns:0, lastInter:0,
   INTER_EVERY:3, INTER_GAP_MS:90000,
+  logs:[],
+  log(m){ const t=new Date(); this.logs.push(String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0')+':'+String(t.getSeconds()).padStart(2,'0')+'  '+m); if(this.logs.length>40) this.logs.shift(); const el=document.getElementById('adDiag'); if(el && !el.hidden) el.textContent=this.logs.join('\n'); },
+  err(e){ return e ? ((e.code!==undefined?'kod '+e.code+' · ':'') + (e.message||e.errorMessage||JSON.stringify(e))) : '?'; },
   async init(){
+    this.log('platform: ' + (this.native ? window.Capacitor.getPlatform() : 'web (önizleme)'));
     if(!this.native) return;
     try{
       const cfg = window.CAMK_ADS || {}, plat = window.Capacitor.getPlatform();
       this.test = cfg.test !== false;
       this.units = this.test ? TEST_UNITS[plat] : (cfg[plat] || null);
-      if(!this.units) return;
+      this.log('mod: ' + (this.test ? 'TEST reklamları' : 'gerçek reklamlar'));
+      if(!this.units){ this.log('HATA: bu platform için reklam birimi yok'); return; }
       this.plugin = window.Capacitor.registerPlugin('AdMob');
       await this.plugin.initialize({initializeForTesting: this.test});
+      this.log('AdMob başlatıldı');
       let consent = {canRequestAds:true};
       try{
         consent = await this.plugin.requestConsentInfo();
+        this.log('onay durumu: ' + consent.status + ' · reklam istenebilir: ' + consent.canRequestAds);
         if(consent.isConsentFormAvailable && consent.status==='REQUIRED') consent = await this.plugin.showConsentForm();
-      }catch(e){}
+      }catch(e){ this.log('onay bilgisi alınamadı: ' + this.err(e)); }
       if(plat==='ios'){
         try{ const t = await this.plugin.trackingAuthorizationStatus(); if(t.status==='notDetermined') await this.plugin.requestTrackingAuthorization(); }catch(e){}
       }
       this.ok = consent.canRequestAds !== false;
-      if(!this.ok) return;
+      if(!this.ok){ this.log('HATA: onay olmadan reklam istenemiyor'); return; }
       const P = this.plugin;
+      P.addListener('bannerAdLoaded', ()=>this.log('banner yüklendi ✓'));
+      P.addListener('bannerAdFailedToLoad', e=>this.log('banner yüklenemedi: ' + this.err(e)));
       P.addListener('interstitialAdDismissed', ()=>{ this.interReady=false; this._interDone && this._interDone(); this.loadInter(); });
       P.addListener('interstitialAdFailedToShow', ()=>{ this.interReady=false; this._interDone && this._interDone(); this.loadInter(); });
       P.addListener('onRewardedVideoAdReward', ()=>{ this._earned = true; });
@@ -1338,10 +1353,10 @@ const Ads = {
       P.addListener('onRewardedVideoAdFailedToShow', ()=>{ this.rewardReady=false; this._rewDone && this._rewDone(); this.loadReward(); });
       this.loadInter(); this.loadReward();
       if(state==='menu') this.showBanner();
-    }catch(e){ this.ok = false; }
+    }catch(e){ this.ok = false; this.log('HATA (başlatma): ' + this.err(e)); }
   },
-  async loadInter(){ try{ await this.plugin.prepareInterstitial({adId:this.units.interstitial}); this.interReady=true; }catch(e){ this.interReady=false; setTimeout(()=>this.loadInter(), 30000); } },
-  async loadReward(){ try{ await this.plugin.prepareRewardVideoAd({adId:this.units.rewarded}); this.rewardReady=true; }catch(e){ this.rewardReady=false; setTimeout(()=>this.loadReward(), 30000); } },
+  async loadInter(){ try{ await this.plugin.prepareInterstitial({adId:this.units.interstitial}); this.interReady=true; this.log('geçiş reklamı hazır ✓'); }catch(e){ this.interReady=false; this.log('geçiş reklamı yüklenemedi: ' + this.err(e)); setTimeout(()=>this.loadInter(), 30000); } },
+  async loadReward(){ try{ await this.plugin.prepareRewardVideoAd({adId:this.units.rewarded}); this.rewardReady=true; this.log('ödüllü reklam hazır ✓'); }catch(e){ this.rewardReady=false; this.log('ödüllü reklam yüklenemedi: ' + this.err(e)); setTimeout(()=>this.loadReward(), 30000); } },
   rewardAvailable(){ return this.native ? (this.ok && this.rewardReady) : true; },
   showBanner(){
     document.body.classList.add('hasBanner');
@@ -1628,7 +1643,7 @@ canvas.addEventListener('pointerdown', e=>{
 });
 canvas.addEventListener('pointermove', e=>{
   if(!drag || e.pointerId!==drag.id) return;
-  const k = 60, dx = clamp(e.clientX-drag.x,-k,k), dy = clamp(e.clientY-drag.y,-k,k);
+  const k = 70, dx = clamp(e.clientX-drag.x,-k,k), dy = clamp(e.clientY-drag.y,-k,k);
   dragVec.x = dx/k; dragVec.y = -dy/k;
   joyK.style.transform = `translate(${dx}px,${dy}px)`;
 });
@@ -1707,7 +1722,8 @@ function syncToggles(){
   [['setSfx','sfx'],['setMusic','music'],['setVib','vib'],['setTilt','tilt']].forEach(([id,k])=>{ const b=$(id); b.setAttribute('aria-pressed', String(!!settings[k])); b.textContent = L(settings[k]?'Açık':'Kapalı'); });
   $('muteBtn').textContent = (settings.sfx||settings.music) ? '♪' : '×';
   $('muteBtn').setAttribute('aria-label', L((settings.sfx||settings.music) ? 'Sesi kapat' : 'Sesi aç'));
-  store.set('settings', {sfx:settings.sfx, music:settings.music, vib:settings.vib});
+  $('setSens').textContent = L((SENS[settings.sens]||SENS[1])[0]);
+  store.set('settings', {sfx:settings.sfx, music:settings.music, vib:settings.vib, sens:settings.sens});
   Snd.applySettings();
 }
 $('setSfx').onclick = ()=>{ Snd.init(); settings.sfx=!settings.sfx; syncToggles(); Snd.play('click'); };
@@ -1922,11 +1938,14 @@ function tick(now){
     const v = speed * (slow>0 ? 0.55 : 1);
     s += v*dt;
 
-    let ix = (keys['arrowright']||keys['d']?1:0) - (keys['arrowleft']||keys['a']?1:0) + dragVec.x + (settings.tilt?tilt.x:0);
-    let iy = (keys['arrowup']||keys['w']?1:0) - (keys['arrowdown']||keys['s']?1:0) + dragVec.y + (settings.tilt?tilt.y:0);
+    // analog input (drag / tilt): small dead zone + soft curve so tiny finger moves give fine control
+    const curve = v => { const a = Math.abs(v); return a < 0.1 ? 0 : Math.sign(v) * Math.pow(Math.min(1,(a-0.1)/0.9), 1.6); };
+    let ix = (keys['arrowright']||keys['d']?1:0) - (keys['arrowleft']||keys['a']?1:0) + curve(dragVec.x) + (settings.tilt?curve(tilt.x):0);
+    let iy = (keys['arrowup']||keys['w']?1:0) - (keys['arrowdown']||keys['s']?1:0) + curve(dragVec.y) + (settings.tilt?curve(tilt.y):0);
     const m = Math.hypot(ix,iy); if(m>1){ ix/=m; iy/=m; }
-    vel.x += (ix*7.5 - vel.x)*Math.min(1,9*rdt);
-    vel.y += (iy*7.5 - vel.y)*Math.min(1,9*rdt);
+    const [, vmax, resp] = SENS[settings.sens] || SENS[1];
+    vel.x += (ix*vmax - vel.x)*Math.min(1,resp*rdt);
+    vel.y += (iy*vmax - vel.y)*Math.min(1,resp*rdt);
     // cracked glass: turbulence
     const crackNow = W.cracks.some(([a,b])=>s>=a && s<=b);
     if(crackNow){ vel.x += (Math.random()-0.5)*90*rdt; vel.y += (Math.random()-0.5)*90*rdt; shake = Math.max(shake, 0.14); }
@@ -2139,6 +2158,9 @@ setTimeout(initLB, 0);
 Ads.showBanner(); Ads.init();
 $('setLang').onclick = ()=>{ Snd.init(); Snd.play('click'); setLang(LANG==='en' ? 'tr' : 'en'); };
 $('gcBtn').onclick = ()=>GC.show(lbBoard);
+$('setSens').onclick = ()=>{ Snd.init(); Snd.play('click'); settings.sens = (settings.sens+1) % SENS.length; syncToggles(); };
+let verTaps = 0;
+$('verTap').onclick = ()=>{ if(++verTaps>=5){ const d=$('adDiag'); d.hidden=false; d.textContent = Ads.logs.join('\n') || '…'; } };
 setLang(LANG);
 GC.init();
 if(Ads.native){
