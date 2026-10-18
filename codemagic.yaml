@@ -35,7 +35,11 @@ workflows:
           agvtool new-version -all $((BUILD_NUMBER + 1))
       - name: IPA üret
         script: |
-          xcode-project build-ipa --project ios/App/App.xcodeproj --scheme App
+          if ! xcode-project build-ipa --project ios/App/App.xcodeproj --scheme App; then
+            echo "=============== XCODE HATALARI ==============="
+            grep -h -E "error:|Provisioning profile|entitlement" /tmp/xcodebuild_logs/*.log | sort -u | head -60
+            exit 1
+          fi
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
