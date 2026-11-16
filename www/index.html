@@ -134,6 +134,15 @@ body.menu .hud, body.menu #pauseBtn, body.landing .hud:not(#toast), body.landing
 @media (max-width:460px){.stats{grid-template-columns:repeat(2,1fr)}}
 @media (max-width:600px){#score{top:auto;bottom:calc(34px + env(safe-area-inset-bottom,0px))}#pops{bottom:calc(104px + env(safe-area-inset-bottom,0px))}#lives .lbl{display:none}#hint{font-size:11px}}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+#tut{z-index:8;background:rgba(3,5,15,.94)}
+.tut{box-sizing:border-box;text-align:center;justify-items:center;max-width:420px;background:#0a1224;border:1px solid var(--line);border-radius:12px;padding:26px 20px 22px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.tut p{text-align:center}
+.tutArt{width:132px;height:132px;color:var(--glass);filter:drop-shadow(0 0 14px rgba(127,227,255,.35))}
+.tutArt svg{width:100%;height:100%}
+.dots{display:flex;gap:8px;justify-content:center}
+.dots i{width:8px;height:8px;border-radius:50%;background:var(--line)}
+.dots i.on{background:var(--glass);box-shadow:0 0 8px var(--glass)}
+.setBtns button{flex:1 1 140px}
 button.go{font:700 16px var(--display);letter-spacing:.1em;text-transform:uppercase;color:var(--void);background:var(--glass);border:0;border-radius:4px;padding:14px 26px;cursor:pointer;box-shadow:0 0 24px rgba(127,227,255,.35)}
 button.ghost{font:600 13px var(--mono);letter-spacing:.08em;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:4px;padding:12px 18px;cursor:pointer}
 button.go:hover{filter:brightness(1.1)}
@@ -222,7 +231,8 @@ button.go:focus-visible,button.ghost:focus-visible{outline:2px solid var(--ink);
       <div class="tog"><span>Titreşim (telefon)</span><button id="setVib" aria-pressed="true">Açık</button></div>
       <div class="tog"><span>Telefonu eğerek yönlendir</span><button id="setTilt" aria-pressed="false">Kapalı</button></div>
       <p class="note" id="tiltNote"></p>
-      <p class="note" id="verTap">Uzay Kaydırağı 1.1</p>
+      <div class="row setBtns"><button class="ghost" id="tutAgain">Nasıl oynanır?</button><button class="ghost" id="shareBtn">Oyunu paylaş</button><button class="ghost" id="rateBtn">Puan ver</button></div>
+      <p class="note" id="verTap">Uzay Kaydırağı 1.3</p>
       <pre id="adDiag" hidden></pre>
     </div>
   </div>
@@ -241,7 +251,7 @@ button.go:focus-visible,button.ghost:focus-visible{outline:2px solid var(--ink);
     </div>
     <p class="note" id="endLb"></p>
     <div class="row"><button class="ad" id="doubleBtn" hidden>Reklam izle, kristalleri 2 katına çıkar</button></div>
-    <div class="row"><button class="go" id="againBtn">Tekrar kay</button><button class="ghost" id="menuBtn">Menü</button></div>
+    <div class="row"><button class="go" id="againBtn">Tekrar kay</button><button class="ghost" id="menuBtn">Menü</button><button class="ghost" id="shareScoreBtn">Skoru paylaş</button></div>
   </div>
 </div>
 
@@ -252,6 +262,17 @@ button.go:focus-visible,button.ghost:focus-visible{outline:2px solid var(--ink);
     <p>Kısa bir reklam izle, Ayaz 1 kalkanla kaldığı yerden devam etsin. Her turda bir kez.</p>
     <div class="revbar"><i id="revBar"></i></div>
     <div class="row"><button class="ad" id="reviveBtn">Reklam izle, devam et</button><button class="ghost" id="giveUpBtn">Bitir</button></div>
+  </div>
+</div>
+
+<div class="overlay center" id="tut" hidden>
+  <div class="card tut" role="dialog" aria-modal="true" aria-labelledby="tutTitle">
+    <div class="eyebrow" id="tutStep"></div>
+    <div class="tutArt" id="tutArt" aria-hidden="true"></div>
+    <h2 id="tutTitle"></h2>
+    <p id="tutText"></p>
+    <div class="dots" id="tutDots"></div>
+    <div class="row"><button class="go" id="tutNext"></button><button class="ghost" id="tutSkip"></button></div>
   </div>
 </div>
 
@@ -296,6 +317,18 @@ const EN = {
   'Kaymaya başla':'Start sliding','kristal · koşularda topladıkların burada birikir':'crystals · everything you collect in runs adds up here',
   'Giysi':'Suit','Vizör':'Visor','İz':'Trail','Skor tablosu yükleniyor…':'Loading leaderboard…',
   'Ses efektleri':'Sound effects','Müzik':'Music','Titreşim (telefon)':'Vibration (phone)','Telefonu eğerek yönlendir':'Steer by tilting the phone',
+  'Nasıl oynanır?':'How to play','Oyunu paylaş':'Share the game','Puan ver':'Rate the game','Skoru paylaş':'Share score',
+  'İleri':'Next','Atla':'Skip','Başla':'Start','Bağlantı kopyalandı':'Link copied',
+  "Uzay Kaydırağı'nda {n} puan yaptım! Sen geçebilir misin?":'I scored {n} in Uzay Kaydırağı (Space Slide)! Can you beat it?',
+  "Uzaydan Dünya'ya cam bir tüpte kayıyorum: Uzay Kaydırağı":'Sliding from space to Earth inside a glass tube: Uzay Kaydırağı (Space Slide)',
+  "Uzaydan Dünya'ya kay":'Slide from space to Earth',
+  "Ayaz, uzaydan Dünya'ya uzanan cam bir tüpün içinde kayıyor. Amacın engellere çarpmadan yere inmek.":'Ayaz slides down a glass tube that reaches from space to Earth. Your goal is to land without hitting the obstacles.',
+  'Parmağınla yönlendir':'Steer with your finger',
+  "Ekranın herhangi bir yerine basılı tut ve parmağını kaydır, joystick gibi çalışır. Klavyede ok tuşları ya da WASD. Hassasiyeti Ayarlar'dan değiştirebilirsin.":'Hold anywhere on the screen and slide your finger, it works like a joystick. On a keyboard use the arrow keys or WASD. You can change the sensitivity in Settings.',
+  'Kalkanını koru':'Protect your shields',
+  "Her çarpışma bir kalkan götürür. Mavi halkalı kalkan bölgelerindeki küreleri topla, kalkanın 6'ya kadar çıkar. Kristallerle Dolap'ta yeni giysiler açılır.":'Every hit costs one shield. Collect the orbs in blue-ringed shield zones to raise your shields up to 6. Crystals unlock new outfits in the Wardrobe.',
+  'Kıl payı geç, kart topla':'Near misses and fact cards',
+  'Engelin kıyısından sıyırarak geçersen kombo çarpanın artar. Her irtifa noktasında yeni bir uzay bilgisi kartı açılır.':'Graze past an obstacle to raise your combo multiplier. Each altitude milestone unlocks a new space fact card.',
   'Dil':'Language','Kontrol hassasiyeti':'Control sensitivity','Düşük':'Low','Normal':'Normal','Yüksek':'High','Açık':'On','Kapalı':'Off','Kalkanlar bitti':'Out of shields','skor':'score','en iyi kombo':'best combo',
   'Reklam izle, kristalleri 2 katına çıkar':'Watch an ad to double your crystals','Tekrar kay':'Slide again','Menü':'Menu',
   'Son şans':'Last chance','Kısa bir reklam izle, Ayaz 1 kalkanla kaldığı yerden devam etsin. Her turda bir kez.':'Watch a short ad and Ayaz carries on from here with 1 shield. Once per run.',
@@ -1330,7 +1363,9 @@ const Ads = {
       this.log('mod: ' + (this.test ? 'TEST reklamları' : 'gerçek reklamlar'));
       if(!this.units){ this.log('HATA: bu platform için reklam birimi yok'); return; }
       this.plugin = window.Capacitor.registerPlugin('AdMob');
-      await this.plugin.initialize({initializeForTesting: this.test});
+      // iOS: ask App Tracking Transparency first, before the ads SDK starts collecting anything
+      if(plat==='ios') await this.askTracking();
+      await this.plugin.initialize({initializeForTesting: this.test, requestTrackingAuthorization: false});
       this.log('AdMob başlatıldı');
       let consent = {canRequestAds:true};
       try{
@@ -1338,9 +1373,6 @@ const Ads = {
         this.log('onay durumu: ' + consent.status + ' · reklam istenebilir: ' + consent.canRequestAds);
         if(consent.isConsentFormAvailable && consent.status==='REQUIRED') consent = await this.plugin.showConsentForm();
       }catch(e){ this.log('onay bilgisi alınamadı: ' + this.err(e)); }
-      if(plat==='ios'){
-        try{ const t = await this.plugin.trackingAuthorizationStatus(); if(t.status==='notDetermined') await this.plugin.requestTrackingAuthorization(); }catch(e){}
-      }
       this.ok = consent.canRequestAds !== false;
       if(!this.ok){ this.log('HATA: onay olmadan reklam istenemiyor'); return; }
       const P = this.plugin;
@@ -1354,6 +1386,23 @@ const Ads = {
       this.loadInter(); this.loadReward();
       if(state==='menu') this.showBanner();
     }catch(e){ this.ok = false; this.log('HATA (başlatma): ' + this.err(e)); }
+  },
+  // iOS ignores the ATT request while the app is not yet active (e.g. still launching),
+  // so wait until it is active, ask, and retry if the status is still undecided.
+  async askTracking(){
+    const P = this.plugin, sleep = ms => new Promise(r=>setTimeout(r, ms));
+    const status = async ()=>{ try{ return (await P.trackingAuthorizationStatus()).status; }catch(e){ return 'unknown'; } };
+    let AppP = null; try{ AppP = window.Capacitor.registerPlugin('App'); }catch(e){}
+    const active = async ()=>{ try{ return AppP ? !!(await AppP.getState()).isActive : document.visibilityState==='visible'; }catch(e){ return document.visibilityState==='visible'; } };
+    let st = await status();
+    this.log('ATT durumu: ' + st);
+    for(let i=0; i<6 && st==='notDetermined'; i++){
+      for(let w=0; w<40 && !(await active()); w++) await sleep(250);
+      await sleep(i===0 ? 800 : 1500);
+      try{ await P.requestTrackingAuthorization(); }catch(e){ this.log('ATT isteği hata: ' + this.err(e)); }
+      st = await status();
+      this.log('ATT cevabı (' + (i+1) + '): ' + st);
+    }
   },
   async loadInter(){ try{ await this.plugin.prepareInterstitial({adId:this.units.interstitial}); this.interReady=true; this.log('geçiş reklamı hazır ✓'); }catch(e){ this.interReady=false; this.log('geçiş reklamı yüklenemedi: ' + this.err(e)); setTimeout(()=>this.loadInter(), 30000); } },
   async loadReward(){ try{ await this.plugin.prepareRewardVideoAd({adId:this.units.rewarded}); this.rewardReady=true; this.log('ödüllü reklam hazır ✓'); }catch(e){ this.rewardReady=false; this.log('ödüllü reklam yüklenemedi: ' + this.err(e)); setTimeout(()=>this.loadReward(), 30000); } },
@@ -1744,7 +1793,7 @@ $('doubleBtn').onclick = async ()=>{
   $('doubleBtn').disabled = false;
   if(ok && !doubled){ doubled = true; wallet += crystals; store.set('wallet', wallet); $('eCrys').textContent = crystals*2; $('doubleBtn').hidden = true; $('endLb').textContent = L('{n} kristal daha cüzdanına eklendi.', {n:crystals}); Snd.play('buy'); }
 };
-$('startBtn').onclick=start;
+$('startBtn').onclick=()=>{ if(!store.get('tut',0)) openTut(start); else start(); };
 $('againBtn').onclick=async ()=>{ await Ads.maybeInterstitial(); start(); };
 $('menuBtn').onclick=async ()=>{ await Ads.maybeInterstitial(); toMenu(); }; $('quitBtn').onclick=toMenu;
 $('resumeBtn').onclick=togglePause; $('pauseBtn').onclick=togglePause;
@@ -1918,6 +1967,69 @@ function setLang(l){
   selectRouteLabels();
   $('setLang').textContent = LANG==='en' ? 'English' : 'Türkçe';
 }
+
+// ---------- tutorial (first launch, skippable) ----------
+const ICO = {
+  tube:'<svg viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><circle cx="60" cy="98" r="18"/><path d="M24 92c4-6 9-9 14-10M84 84c6 1 11 4 13 8" opacity=".5"/><path d="M40 6c0 30 6 52 14 74M62 6c0 28 4 50 12 72"/><circle cx="56" cy="36" r="6" fill="currentColor"/><path d="M18 18l3 3M96 12l2 2M100 40l3 3M14 54l2 2" opacity=".6"/></svg>',
+  drag:'<svg viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="60" cy="60" r="40" opacity=".35"/><circle cx="74" cy="48" r="14"/><path d="M60 16v-6m0 100v-6M16 60h-6m100 0h-6" opacity=".6"/><path d="M48 10l12-8 12 8M48 110l12 8 12-8M10 48L2 60l8 12M110 48l8 12-8 12" opacity=".6"/></svg>',
+  shield:'<svg viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><path d="M60 10l38 14v30c0 26-17 44-38 56C39 98 22 80 22 54V24z"/><path d="M60 34v40M40 54h40"/><circle cx="104" cy="96" r="7" fill="currentColor" opacity=".7"/><circle cx="14" cy="98" r="5" fill="currentColor" opacity=".5"/></svg>',
+  card:'<svg viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"><rect x="26" y="14" width="62" height="86" rx="6" transform="rotate(-8 57 57)" opacity=".45"/><rect x="34" y="20" width="62" height="86" rx="6"/><path d="M46 44h38M46 58h38M46 72h24"/><path d="M14 30l6 6m0-6l-6 6M100 100l6 6m0-6l-6 6" opacity=".7"/></svg>'
+};
+const TUT = [
+  {i:'tube', t:"Uzaydan Dünya'ya kay", d:"Ayaz, uzaydan Dünya'ya uzanan cam bir tüpün içinde kayıyor. Amacın engellere çarpmadan yere inmek."},
+  {i:'drag', t:'Parmağınla yönlendir', d:"Ekranın herhangi bir yerine basılı tut ve parmağını kaydır, joystick gibi çalışır. Klavyede ok tuşları ya da WASD. Hassasiyeti Ayarlar'dan değiştirebilirsin."},
+  {i:'shield', t:'Kalkanını koru', d:"Her çarpışma bir kalkan götürür. Mavi halkalı kalkan bölgelerindeki küreleri topla, kalkanın 6'ya kadar çıkar. Kristallerle Dolap'ta yeni giysiler açılır."},
+  {i:'card', t:'Kıl payı geç, kart topla', d:'Engelin kıyısından sıyırarak geçersen kombo çarpanın artar. Her irtifa noktasında yeni bir uzay bilgisi kartı açılır.'}
+];
+let tutI = 0, tutThen = null;
+function tutRender(){
+  const st = TUT[tutI];
+  $('tutStep').textContent = (tutI+1)+' / '+TUT.length;
+  $('tutArt').innerHTML = ICO[st.i];
+  $('tutTitle').textContent = L(st.t);
+  $('tutText').textContent = L(st.d);
+  $('tutDots').innerHTML = TUT.map((_,k)=>'<i'+(k===tutI?' class="on"':'')+'></i>').join('');
+  $('tutNext').textContent = L(tutI===TUT.length-1 ? 'Başla' : 'İleri');
+  $('tutSkip').textContent = L('Atla');
+}
+function openTut(then){ tutThen = then||null; tutI = 0; tutRender(); $('tut').hidden = false; $('tutNext').focus(); }
+function closeTut(go){ $('tut').hidden = true; store.set('tut', 1); const f = tutThen; tutThen = null; if(go && f) f(); }
+$('tutNext').onclick = ()=>{ Snd.init(); Snd.play('click'); if(tutI < TUT.length-1){ tutI++; tutRender(); } else closeTut(true); };
+$('tutSkip').onclick = ()=>{ Snd.init(); Snd.play('click'); closeTut(true); };
+$('tutAgain').onclick = ()=>{ Snd.init(); Snd.play('click'); openTut(null); };
+
+// ---------- share & rate ----------
+const PKG = 'com.burak383.uzaykaydiragi';
+const IOS_APP_ID = '';   // App Store Connect > Uygulama Bilgileri > Apple Kimliği (sadece rakamlar)
+const PLAT = Ads.native ? window.Capacitor.getPlatform() : 'web';
+function storeLink(){
+  if(PLAT==='ios') return IOS_APP_ID ? 'https://apps.apple.com/app/id'+IOS_APP_ID : '';
+  return 'https://play.google.com/store/apps/details?id='+PKG;
+}
+async function shareGame(score){
+  const url = storeLink();
+  const text = score!=null ? L("Uzay Kaydırağı'nda {n} puan yaptım! Sen geçebilir misin?", {n:fmt(score)}) : L("Uzaydan Dünya'ya cam bir tüpte kayıyorum: Uzay Kaydırağı");
+  const data = {title:'Uzay Kaydırağı', text};
+  if(url) data.url = url;
+  try{
+    if(Ads.native && window.Capacitor.isPluginAvailable && window.Capacitor.isPluginAvailable('Share')){
+      await window.Capacitor.registerPlugin('Share').share(Object.assign({dialogTitle:L('Oyunu paylaş')}, data)); return;
+    }
+    if(navigator.share){ await navigator.share(data); return; }
+    await navigator.clipboard.writeText(text + (url ? ' '+url : '')); toast('Bağlantı kopyalandı');
+  }catch(e){}
+}
+function rateGame(){
+  let u;
+  if(PLAT==='android') u = 'market://details?id='+PKG;
+  else if(PLAT==='ios') u = 'itms-apps://itunes.apple.com/app/id'+IOS_APP_ID+'?action=write-review';
+  else { window.open(storeLink(), '_blank'); return; }
+  location.href = u;   // Capacitor hands non-app URLs to the system (Play Store / App Store)
+}
+$('shareBtn').onclick = ()=>{ Snd.init(); Snd.play('click'); shareGame(null); };
+$('shareScoreBtn').onclick = ()=>{ Snd.init(); Snd.play('click'); shareGame(Math.round(+String($('eScore').textContent).replace(/\D/g,'')||0)); };
+$('rateBtn').onclick = ()=>{ Snd.init(); Snd.play('click'); rateGame(); };
+if(PLAT==='ios' && !IOS_APP_ID) $('rateBtn').hidden = true;
 
 // ---------- main loop ----------
 const F = {}, CF = {}, LF = {};
@@ -2168,6 +2280,7 @@ if(Ads.native){
     const AppP = window.Capacitor.registerPlugin('App');
     AppP.addListener('backButton', ()=>{
       if(!$('adMock').hidden) return;
+      if(!$('tut').hidden){ closeTut(false); return; }
       if(state==='play') togglePause();
       else if(state==='pause' || state==='over' || state==='win') toMenu();
       else if(state==='menu') AppP.exitApp();
