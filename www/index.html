@@ -67,7 +67,7 @@ button{font-family:inherit}
 .factc p{margin:0;font-size:12px;line-height:1.5;color:var(--muted)}
 .factc.locked{border-left-color:var(--line);opacity:.65}
 .factc.locked small{color:var(--muted)}
-body.menu #fact{display:none!important}
+body.menu #fact,body.ended #fact{display:none!important}
 #adDiag{white-space:pre-wrap;word-break:break-word;font:11px/1.5 var(--mono);color:var(--ink);background:#060a16;border:1px solid var(--line);border-radius:6px;padding:10px;margin:0;max-height:260px;overflow:auto}
 #hint{bottom:calc(16px + env(safe-area-inset-bottom,0px));left:0;right:0;text-align:center;font-size:12px;color:var(--muted);padding-inline:16px}
 #flash{position:fixed;inset:0;background:radial-gradient(ellipse at center,transparent 35%,var(--danger));opacity:0;pointer-events:none;z-index:3;transition:opacity .35s}
@@ -78,7 +78,7 @@ body.menu #fact{display:none!important}
 .topbtn:focus-visible{outline:2px solid var(--glass)}
 #pauseBtn{right:12px}
 #muteBtn{right:52px}
-body.menu .hud, body.menu #pauseBtn, body.landing .hud:not(#toast), body.landing #pauseBtn{display:none!important}
+body.menu .hud, body.menu #pauseBtn, body.ended .hud, body.ended #pauseBtn, body.landing .hud:not(#toast), body.landing #pauseBtn{display:none!important}
 .overlay{position:fixed;inset:0;z-index:5;display:grid;align-items:end;padding:16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px));background:linear-gradient(180deg,rgba(3,5,15,0) 20%,rgba(3,5,15,.9) 70%);overflow:auto}
 .overlay.center{align-items:center;background:radial-gradient(ellipse at 50% 60%,rgba(3,5,15,.55),rgba(3,5,15,.92))}
 .card{max-width:580px;width:100%;display:grid;gap:14px;text-align:left;margin-inline:auto;min-width:0}
@@ -232,7 +232,7 @@ button.go:focus-visible,button.ghost:focus-visible{outline:2px solid var(--ink);
       <div class="tog"><span>Telefonu eğerek yönlendir</span><button id="setTilt" aria-pressed="false">Kapalı</button></div>
       <p class="note" id="tiltNote"></p>
       <div class="row setBtns"><button class="ghost" id="tutAgain">Nasıl oynanır?</button><button class="ghost" id="shareBtn">Oyunu paylaş</button><button class="ghost" id="rateBtn">Puan ver</button></div>
-      <p class="note" id="verTap">Uzay Kaydırağı 1.3</p>
+      <p class="note" id="verTap">Uzay Kaydırağı 1.3.1</p>
       <pre id="adDiag" hidden></pre>
     </div>
   </div>
@@ -361,7 +361,6 @@ const EN = {
   'Çatlak cam: tüp sarsılıyor':'Cracked glass: the tube is shaking','Kalkan bölgesi: mavi küreleri topla':'Shield zone: collect the blue orbs',
   'Kalkan bölgesi · kalkanların dolu, küreler puan verir':'Shield zone · shields full, orbs give points',
   'Paraşüt açıldı':'Parachute open','Hedefe indin':'Landed on target','Ayaz devam ediyor':'Ayaz carries on',
-  'Telefonu eğerek yönlendir':'Steer by tilting the phone',
   // rail
   'ISS':'ISS','Kármán hattı':'Kármán line','Kármán':'Kármán','Plazma':'Plasma','Yolcu uçağı':'Airliner','Yer':'Ground','GEO':'GEO',
   // menu & end
@@ -1336,7 +1335,14 @@ const Snd = {
   },
   pause(p){ if(!this.ctx) return; if(p) this.ctx.suspend(); else this.ctx.resume(); }
 };
-function buzz(p){ if(settings.vib && navigator.vibrate){ try{ navigator.vibrate(p); }catch(e){} } }
+// vibration: native Haptics plugin in the app (WebView vibrate does not work on iOS or without permission on Android)
+let hapP;
+function buzz(p){
+  if(!settings.vib) return;
+  if(hapP===undefined){ hapP = null; try{ const C = window.Capacitor; if(C && C.isNativePlatform && C.isNativePlatform() && C.isPluginAvailable('Haptics')) hapP = C.registerPlugin('Haptics'); }catch(e){} }
+  if(hapP){ const ms = Array.isArray(p) ? p.reduce((a,b)=>a+b,0) : p; hapP.impact({style: ms>=100 ? 'HEAVY' : ms>=30 ? 'MEDIUM' : 'LIGHT'}).catch(()=>{}); return; }
+  if(navigator.vibrate){ try{ navigator.vibrate(p); }catch(e){} }
+}
 
 // ---------- ads: AdMob inside the app, labelled previews on the web ----------
 // The app build defines window.CAMK_ADS in ads-config.js. Without it (Claude page, browser) the game shows previews.
@@ -1353,7 +1359,12 @@ const Ads = {
   logs:[],
   log(m){ const t=new Date(); this.logs.push(String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0')+':'+String(t.getSeconds()).padStart(2,'0')+'  '+m); if(this.logs.length>40) this.logs.shift(); const el=document.getElementById('adDiag'); if(el && !el.hidden) el.textContent=this.logs.join('\n'); },
   err(e){ return e ? ((e.code!==undefined?'kod '+e.code+' · ':'') + (e.message||e.errorMessage||JSON.stringify(e))) : '?'; },
+  attDone:null,
   async init(){
+    this.attDone = new Promise(r=>this._attEnd=r);
+    try{ await this._init(); }finally{ this._attEnd(); }
+  },
+  async _init(){
     this.log('platform: ' + (this.native ? window.Capacitor.getPlatform() : 'web (önizleme)'));
     if(!this.native) return;
     try{
@@ -1365,6 +1376,7 @@ const Ads = {
       this.plugin = window.Capacitor.registerPlugin('AdMob');
       // iOS: ask App Tracking Transparency first, before the ads SDK starts collecting anything
       if(plat==='ios') await this.askTracking();
+      this._attEnd && this._attEnd();
       await this.plugin.initialize({initializeForTesting: this.test, requestTrackingAuthorization: false});
       this.log('AdMob başlatıldı');
       let consent = {canRequestAds:true};
@@ -1513,6 +1525,8 @@ const bests = store.get('bests', {});
 let lastRunBoard = null;
 
 function boardKey(){ return route.daily ? 'daily' : route.id; }
+// local bests: the daily course changes every day, so its best is kept per day
+const bestKey = k => k==='daily' ? 'daily-'+today : k;
 function selectRoute(r){
   const seed = r.daily ? hashStr('camk-'+today) : r.seed;
   buildWorld(r, seed);
@@ -1526,7 +1540,7 @@ function selectRoute(r){
 
 function selectRouteLabels(){
   $('menuEyebrow').textContent = route.daily ? L('Günün Parkuru') + ' · ' + todayLabel : L('Astronot Ayaz') + ' · ' + L(route.name);
-  const b = bests[boardKey()];
+  const b = bests[bestKey(boardKey())];
   $('bestLine').textContent = b ? L('Bu görevdeki en iyi skorun: {n}', {n:fmt(b)}) : '';
 }
 function start(){
@@ -1542,7 +1556,7 @@ function start(){
   resetHeroPose(); resetFacts();
   resetDust(0); renderRail(); renderLives(); renderPower();
   $('menu').hidden=true; $('end').hidden=true; $('paused').hidden=true;
-  document.body.classList.remove('menu','landing');
+  document.body.classList.remove('menu','landing','ended');
   $('hint').textContent = L(settings.tilt ? 'Telefonu eğerek yönlendir' : '← → ↑ ↓ / WASD · dokunmatikte ekranda sürükle');
   state='play';
 }
@@ -1563,12 +1577,13 @@ function beginLanding(){
 }
 function finish(win){
   state = win ? 'win':'over';
-  document.body.classList.remove('landing');
+  document.body.classList.remove('landing'); document.body.classList.add('ended');
+  factTimer = 0; $('fact').classList.remove('show');
   const alt = altAt(s/curveLen);
   wallet += crystals; store.set('wallet', wallet);
   const key = boardKey(); lastRunBoard = key;
-  const prev = bests[key]||0, isBest = score > prev;
-  if(isBest){ bests[key] = Math.round(score); store.set('bests', bests); }
+  const prev = bests[bestKey(key)]||0, isBest = score > prev;
+  if(isBest){ bests[bestKey(key)] = Math.round(score); store.set('bests', bests); }
   $('endEyebrow').textContent = route.daily ? L('Günün Parkuru') + ' · ' + todayLabel : L(route.name);
   $('endTitle').textContent = L(win ? 'Ayaz yere indi' : 'Kalkanlar bitti');
   $('endText').textContent = (win
@@ -1587,7 +1602,7 @@ function finish(win){
 function toMenu(){
   state='menu'; Snd.pause(false); Ads.showBanner();
   $('end').hidden=true; $('paused').hidden=true; $('menu').hidden=false;
-  document.body.classList.add('menu'); document.body.classList.remove('landing');
+  document.body.classList.add('menu'); document.body.classList.remove('landing','ended');
   W.site.visible=false; setTubeVisible(true); resetHeroPose();
   obsRoot.clear(); pickRoot.clear(); obstacles=[]; pickups=[]; s=40; pos.x=0; pos.y=-0.9; vel.x=vel.y=0;
   resetDust(40); selectRoute(route); renderShop(); renderLB();
@@ -1732,7 +1747,7 @@ function renderRoutes(){
   const box = $('routes'); box.innerHTML='';
   ROUTES.forEach(r=>{
     const b = document.createElement('button'); b.className='route'; b.dataset.id = r.id; b.setAttribute('aria-pressed', String(r.id===route.id));
-    const best = bests[r.daily?'daily':r.id];
+    const best = bests[bestKey(r.daily?'daily':r.id)];
     b.innerHTML = `<b></b><span></span><em></em>`;
     b.querySelector('b').textContent = r.daily ? L(r.name) + ' · ' + todayLabel : L(r.name);
     b.querySelector('span').textContent = L(r.desc);
@@ -1812,12 +1827,12 @@ async function renderLB(){
   list.innerHTML='';
   if(GC.available()){
     $('gcBtn').hidden = false;
-    const mine = bests[lbBoard];
+    const mine = bests[bestKey(lbBoard)];
     note.textContent = L(GC.ok ? 'Skorların Game Center sıralamalarına gönderiliyor. Her görevin kendi sıralaması var.' : "Game Center sıralaması için Ayarlar > Game Center'dan giriş yap.") + (mine ? ' ' + L('Bu cihazdaki en iyi skorun: {n}.', {n:fmt(mine)}) : '');
     return;
   }
   if(lbState!=='ready'){
-    const mine = bests[lbBoard];
+    const mine = bests[bestKey(lbBoard)];
     note.textContent = L(lbState==='loading' ? 'Ortak skor tablosu yükleniyor… ' : 'Ortak skor tablosu bu görünümde kullanılamıyor. ') + (mine ? L('Bu cihazdaki en iyi skorun: {n}.', {n:fmt(mine)}) : '');
     return;
   }
@@ -2000,7 +2015,7 @@ $('tutAgain').onclick = ()=>{ Snd.init(); Snd.play('click'); openTut(null); };
 
 // ---------- share & rate ----------
 const PKG = 'com.burak383.uzaykaydiragi';
-const IOS_APP_ID = '';   // App Store Connect > Uygulama Bilgileri > Apple Kimliği (sadece rakamlar)
+const IOS_APP_ID = '6817732859';   // App Store Connect > Uygulama Bilgileri > Apple Kimliği (sadece rakamlar)
 const PLAT = Ads.native ? window.Capacitor.getPlatform() : 'web';
 function storeLink(){
   if(PLAT==='ios') return IOS_APP_ID ? 'https://apps.apple.com/app/id'+IOS_APP_ID : '';
@@ -2274,7 +2289,7 @@ $('setSens').onclick = ()=>{ Snd.init(); Snd.play('click'); settings.sens = (set
 let verTaps = 0;
 $('verTap').onclick = ()=>{ if(++verTaps>=5){ const d=$('adDiag'); d.hidden=false; d.textContent = Ads.logs.join('\n') || '…'; } };
 setLang(LANG);
-GC.init();
+Promise.race([Ads.attDone || Promise.resolve(), new Promise(r=>setTimeout(r, 60000))]).then(()=>GC.init());
 if(Ads.native){
   try{
     const AppP = window.Capacitor.registerPlugin('App');
